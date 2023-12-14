@@ -1,0 +1,61 @@
+*** Creating network
+*** Adding controller
+*** Adding hosts:
+h1 h2 h3 h4 
+*** Adding switches:
+s1 
+*** Adding links:
+(10.00Mbit 5ms delay 10.00000% loss) (10.00Mbit 5ms delay 10.00000% loss) (h1, s1) (10.00Mbit 5ms delay 10.00000% loss) (10.00Mbit 5ms delay 10.00000% loss) (h2, s1) (10.00Mbit 5ms delay 10.00000% loss) (10.00Mbit 5ms delay 10.00000% loss) (h3, s1) (10.00Mbit 5ms delay 10.00000% loss) (10.00Mbit 5ms delay 10.00000% loss) (h4, s1) 
+*** Configuring hosts
+h1 (cfs 100000/100000us) h2 (cfs 100000/100000us) h3 (cfs 100000/100000us) h4 (cfs 100000/100000us) 
+*** Starting controller
+c0 
+*** Starting 1 switches
+s1 ...(10.00Mbit 5ms delay 10.00000% loss) (10.00Mbit 5ms delay 10.00000% loss) (10.00Mbit 5ms delay 10.00000% loss) (10.00Mbit 5ms delay 10.00000% loss) 
+Checking HTTP server process on h1:
+root       11136  0.0  0.0  18884  8704 pts/4    R+   13:17   0:00 python3 -m http.server --bind 0.0.0.0 80
+root       11138  0.0  0.0   9212  2560 pts/4    S+   13:17   0:00 grep http.server
+
+Testing local access to the HTTP server on h1:
+--2023-12-14 13:17:54--  http://localhost/
+Resolving localhost (localhost)... 127.0.0.1
+Connecting to localhost (localhost)|127.0.0.1|:80... failed: Connection refused.
+
+Testing access to the HTTP server on h1 from h2:
+--2023-12-14 13:17:54--  http://10.0.0.1/
+Connecting to 10.0.0.1:80... connected.
+HTTP request sent, awaiting response... 200 OK
+Length: 418 [text/html]
+Saving to: ‘STDOUT’
+
+-                     0%[                    ]       0  --.-KB/s               <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>Directory listing for /</title>
+</head>
+<body>
+<h1>Directory listing for /</h1>
+<hr>
+<ul>
+<li><a href="simpleperf.py">simpleperf.py</a></li>
+<li><a href="test/">test/</a></li>
+<li><a href="venv/">venv/</a></li>
+</ul>
+<hr>
+</body>
+</html>
+-                   100%[===================>]     418  1.66KB/s    in 0.2s    
+
+2023-12-14 13:18:03 (1.66 KB/s) - written to stdout [418/418]
+
+
+*** Stopping 1 controllers
+c0 
+(cfs -1/100000us) (cfs -1/100000us) (cfs -1/100000us) (cfs -1/100000us) *** Stopping 4 links
+....
+*** Stopping 1 switches
+s1 
+*** Stopping 4 hosts
+h1 h2 h3 h4 
+*** Done
