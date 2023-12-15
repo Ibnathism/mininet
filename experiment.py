@@ -51,7 +51,7 @@ def perfTest( lossy=True ):
 
     host1 = net.get('h1')
     # host1.cmd('cd /var/www/html; python3 -m http.server 80 >& /tmp/http_h1.log &')
-    host1.cmd('cd /var/www/html; python3 -m http.server --bind 0.0.0.0 80 >& /tmp/http_h1.log &')
+    host1.cmd('cd ~/var/www/html; python3 -m http.server --bind 0.0.0.0 80 &')
 
     # Check if the server is running
     print("Checking HTTP server process on h1:")
@@ -76,6 +76,11 @@ def perfTest( lossy=True ):
     # Ping the switch from h1
     # host1 = net.get('h1')
     # host1.cmdPrint('ping -c 4 10.0.0.100')
+
+    # Ping the h1 from h2
+    # host1 = net.get('h1')
+    # host2 = net.get('h2')
+    # host2.cmdPrint('ping -c 4 10.0.0.1')
 
     # info( "Dumping host connections\n" )
     # dumpNodeConnections(net.hosts)
