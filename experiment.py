@@ -45,49 +45,19 @@ def perfTest( lossy=True ):
     topo = SingleSwitchTopo( n=4, lossy=lossy )
     net = Mininet( topo=topo,
                    host=CPULimitedHost, link=TCLink,
-                   controller=DefaultController, switch=OVSKernelSwitch,
                    autoStaticArp=True )
     net.start()
 
     host1 = net.get('h1')
-    # host1.cmd('cd /var/www/html; python3 -m http.server 80 >& /tmp/http_h1.log &')
-    host1.cmd('cd ~/var/www/html; python3 -m http.server --bind 0.0.0.0 80 &')
-
-    # Check if the server is running
-    print("Checking HTTP server process on h1:")
+    host2 = net.get('h2')
+    
+    # Start an HTTP server on h1 that serves files from /var/www/html
+    host1.cmdPrint('cd var/www/html; python3 -m http.server 80 &')
     print(host1.cmd('ps aux | grep http.server'))
 
-    # Test accessing the server locally
-    print("Testing local access to the HTTP server on h1:")
-    print(host1.cmd('wget -O - http://localhost:80'))
-
-    # Test accessing the server from another host
-    host2 = net.get('h2')
-    print("Testing access to the HTTP server on h1 from h2:")
-    print(host2.cmd('wget -O - http://10.0.0.1:80'))
-
-
-
-    # info("Testing network connectivity betweem host and switch\n")
-    # Assign IP to switch interface
-    # switch = net.get('s1')
-    # switch.cmd('ifconfig s1-eth1 10.0.0.100')
-
-    # Ping the switch from h1
-    # host1 = net.get('h1')
-    # host1.cmdPrint('ping -c 4 10.0.0.100')
-
-    # Ping the h1 from h2
-    # host1 = net.get('h1')
-    # host2 = net.get('h2')
-    # host2.cmdPrint('ping -c 4 10.0.0.1')
-
-    # info( "Dumping host connections\n" )
-    # dumpNodeConnections(net.hosts)
-
-    # info( "Testing bandwidth between h1 and h4 (lossy=%s)\n" % lossy )
-    # h1, h4 = net.getNodeByName('h1', 'h4')
-    # net.iperf( ( h1, h4 ), l4Type='UDP' )
+    # Download hello.txt from h1 to h2
+    host2.cmdPrint('wget http://10.0.0.1/hello.txt -P var2/h2')
+    
     # Debugging
     # h1.cmd('jobs')
     # h4.cmd('jobs')
