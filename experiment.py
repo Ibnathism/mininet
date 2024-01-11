@@ -52,12 +52,16 @@ def perfTest( lossy=True ):
     host2 = net.get('h2')
     
     # Start an HTTP server on h1 that serves files from /var/www/html
-    host1.cmdPrint('cd var/www/html; python3 -m http.server 80 &')
-    print(host1.cmd('ps aux | grep http.server'))
+    # host1.cmdPrint('cd var/www/html; python3 -m http.server 80 &')
+    # print(host1.cmd('ps aux | grep http.server'))
+    host1.cmdPrint('nc -l -p 12345 > var/www/html/received_file.txt &')
 
     # Download hello.txt from h1 to h2
-    host2.cmdPrint('wget http://10.0.0.1/hello.txt -P var2/h2')
-    
+    # host2.cmdPrint('time wget http://10.0.0.1/hello.txt -P var2/h2')
+    # for i in range(2, 5):
+    #     host = net.get('h' + str(i))
+    #     host.cmdPrint('nc 10.0.0.1 12345 < var2/h' + str(i) + '/hello.txt')
+    host2.cmdPrint('nc 10.0.0.1 12345 < var2/h2/hello.txt')
     # Debugging
     # h1.cmd('jobs')
     # h4.cmd('jobs')
