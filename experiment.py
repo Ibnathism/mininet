@@ -10,7 +10,7 @@ to complete.
 """
 
 from sys import argv
-
+import time
 from mininet.topo import Topo
 from mininet.net import Mininet
 from mininet.node import CPULimitedHost, OVSKernelSwitch, DefaultController
@@ -18,50 +18,46 @@ from mininet.link import TCLink
 from mininet.util import dumpNodeConnections
 from mininet.log import setLogLevel, info
 
-
-# It would be nice if we didn't have to do this:
-# pylint: disable=arguments-differ
-
 class SingleSwitchTopo( Topo ):
     "Single switch connected to n hosts."
-    def build( self, n=2, lossy=True ):
+    def build( self, n=2):
         switch = self.addSwitch('s1')
+        switch2 = self.addSwitch('s2')
         for h in range(n):
             # Each host gets 50%/n of system CPU
-            host = self.addHost('h%s' % (h + 1),
-                                cpu=.5 / n)
-            if lossy:
-                # 10 Mbps, 5ms delay, 10% packet loss
-                self.addLink(host, switch,
-                             bw=10, delay='5ms', loss=10, use_htb=True)
-            else:
-                # 10 Mbps, 5ms delay, no packet loss
-                self.addLink(host, switch,
-                             bw=10, delay='5ms', loss=0, use_htb=True)
+            host = self.addHost('h%s' % (h + 1), cpu=.5 / n)
+            self.addLink(host, switch, bw=100, delay='5ms', loss=0, use_htb=True)
+        
+        self.addLink(switch, switch2, bw=10)
+        host0 = self.addHost('h0', cpu=.5 / n)
+        self.addLink(host0, switch2, bw=100, delay='5ms', loss=0, use_htb=True)
 
 
-def perfTest( lossy=True ):
+
+def perfTest():
     "Create network and run simple performance test"
-    topo = SingleSwitchTopo( n=4, lossy=lossy )
+    topo = SingleSwitchTopo( n=4)
     net = Mininet( topo=topo,
                    host=CPULimitedHost, link=TCLink,
                    autoStaticArp=True )
     net.start()
+    net.pingAll()
 
-    host1 = net.get('h1')
-    host2 = net.get('h2')
+
+    server = net.get('h0')
     
-    # Start an HTTP server on h1 that serves files from /var/www/html
-    # host1.cmdPrint('cd var/www/html; python3 -m http.server 80 &')
-    # print(host1.cmd('ps aux | grep http.server'))
-    host1.cmdPrint('nc -l -p 12345 > var/www/html/received_file.txt &')
+    for i in range(1, 5):
+        host = net.get('h' + str(i))
+        port = 12345 + i  
+        
+        server_cmd = 'nc -l -p ' + str(port) + ' > var/www/html/received_file' + str(i) + '.txt &' 
+        server.cmdPrint(server_cmd)
 
-    # Download hello.txt from h1 to h2
-    # host2.cmdPrint('time wget http://10.0.0.1/hello.txt -P var2/h2')
-    # for i in range(2, 5):
-    #     host = net.get('h' + str(i))
-    #     host.cmdPrint('nc 10.0.0.1 12345 < var2/h' + str(i) + '/hello.txt')
-    host2.cmdPrint('nc 10.0.0.1 12345 < var2/h2/hello.txt')
+        transfer_cmd = 'time nc 10.0.0.1 ' + str(port) + ' < var2/h' + str(i) + '/hello.txt &'
+        host.cmdPrint(transfer_cmd)
+
+    time.sleep(10)
+
     # Debugging
     # h1.cmd('jobs')
     # h4.cmd('jobs')
@@ -74,4 +70,5 @@ if __name__ == '__main__':
     if 'testmode' in argv:
         setLogLevel( 'debug' )
     # Prevent test_simpleperf from failing due to packet loss
-    perfTest( lossy=( 'testmode' not in argv ) )
+    # perfTest( lossy=( 'testmode' not in argv ) )
+    perfTest()
