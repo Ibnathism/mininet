@@ -25,38 +25,47 @@ class SingleSwitchTopo( Topo ):
         switch2 = self.addSwitch('s2')
         for h in range(n):
             # Each host gets 50%/n of system CPU
-            host = self.addHost('h%s' % (h + 1), cpu=.5 / n)
+            host = self.addHost('h%s' % (h), cpu=.5 / (n+1))
             self.addLink(host, switch, bw=100, delay='5ms', loss=0, use_htb=True)
         
         self.addLink(switch, switch2, bw=10)
-        host0 = self.addHost('h0', cpu=.5 / n)
-        self.addLink(host0, switch2, bw=100, delay='5ms', loss=0, use_htb=True)
+        server = self.addHost('server', cpu=.5 / (n+1))
+        self.addLink(server, switch2, bw=100, delay='5ms', loss=0, use_htb=True)
 
 
 
 def perfTest():
     "Create network and run simple performance test"
-    topo = SingleSwitchTopo( n=4)
+    topo = SingleSwitchTopo( n=10)
     net = Mininet( topo=topo,
                    host=CPULimitedHost, link=TCLink,
                    autoStaticArp=True )
     net.start()
-    net.pingAll()
+    # net.pingAll()
 
 
-    server = net.get('h0')
-    
-    for i in range(1, 5):
-        host = net.get('h' + str(i))
-        port = 12345 + i  
+    server = net.get('server')
+    server_IP = server.IP()
+    port_counter = 0
+    for j in range (0, 10): 
+        for i in range(0, 10):
+            host = net.get('h' + str(i))
+            port = 12345 + port_counter  
+            
+            server_cmd = 'nc -l -p ' + str(port) + ' > saved_models/server/user' + str(i) + '/u' + str(i) + '_r' + str(j) + '.pth &'  # '/hello.txt &'
+            
+            server.cmdPrint(server_cmd)
+
+            transfer_cmd = 'time nc ' + server_IP + ' ' + str(port) + ' < saved_models/users/user' + str(i) + '/u' + str(i) + '_r' + str(j) + '.pth &' # '/hello.txt &'
+            
+            host.cmdPrint(transfer_cmd)
+
+            time.sleep(100)
+            port_counter = port_counter + 1
         
-        server_cmd = 'nc -l -p ' + str(port) + ' > var/www/html/received_file' + str(i) + '.txt &' 
-        server.cmdPrint(server_cmd)
+        time.sleep(100)
 
-        transfer_cmd = 'time nc 10.0.0.1 ' + str(port) + ' < var2/h' + str(i) + '/hello.txt &'
-        host.cmdPrint(transfer_cmd)
-
-    time.sleep(10)
+    
 
     # Debugging
     # h1.cmd('jobs')
