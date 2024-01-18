@@ -1,27 +1,17 @@
 #!/usr/bin/env python
 
-"""
-Simple example of setting network and CPU parameters
-
-NOTE: link params limit BW, add latency, and loss.
-There is a high chance that pings WILL fail and that
-iperf will hang indefinitely if the TCP handshake fails
-to complete.
-"""
-
 from sys import argv
 import time
 from mininet.topo import Topo
 from mininet.net import Mininet
-from mininet.node import CPULimitedHost, OVSKernelSwitch, DefaultController
+from mininet.node import CPULimitedHost
 from mininet.link import TCLink
-from mininet.util import dumpNodeConnections
-from mininet.log import setLogLevel, info
+from mininet.log import setLogLevel
 import os
 
-number_of_users = 1
-number_of_files_per_user = 2
-set_id = 2
+number_of_users = 10
+number_of_files_per_user = 10
+set_id = 1
 
 class SingleSwitchTopo( Topo ):
     "Single switch connected to n hosts."
@@ -31,11 +21,11 @@ class SingleSwitchTopo( Topo ):
         for h in range(n):
             # Each host gets 50%/n of system CPU
             host = self.addHost('h%s' % (h), cpu=.5 / (n+1))
-            self.addLink(host, switch, bw=100, delay='0ms', loss=0, use_htb=True)
+            self.addLink(host, switch, bw=100*8, delay='0ms', loss=0, use_htb=True)
         
-        self.addLink(switch, switch2, bw=10)
+        self.addLink(switch, switch2, bw=10*8)
         server = self.addHost('server', cpu=.5 / (n+1))
-        self.addLink(server, switch2, bw=100, delay='0ms', loss=0, use_htb=True)
+        self.addLink(server, switch2, bw=100*8, delay='0ms', loss=0, use_htb=True)
 
 def get_file_size(file_path):
     """Get the size of a file in bytes."""
@@ -82,22 +72,29 @@ def check_completion_of_sending(file_id):
         if size_of_file_in_server != user_file_size:
             return False
     return True
-    
+
+def get_training_times():
+    values_dict = {}
+    with open('Results/training_times.txt', 'r') as file:
+        for line in file:
+            # Assuming each line is in the format "key:value"
+            key, value = line.strip().split(':')
+            values_dict[key] = value
+    return values_dict   
 
 def perfTest():
     "Create network and run simple performance test"
     topo = SingleSwitchTopo( n=10)
-    net = Mininet( topo=topo,
-                   host=CPULimitedHost, link=TCLink,
-                   autoStaticArp=True )
+    net = Mininet( topo=topo, host=CPULimitedHost, link=TCLink, autoStaticArp=True )
     net.start()
     net.pingAll()
-
 
     server = net.get('server')
     server_IP = server.IP()
     port_counter = 0
     
+    training_times = get_training_times()
+    times = []
     for j in range (0, number_of_files_per_user): 
         for i in range(0, number_of_users):
             host = net.get('h' + str(i))
@@ -111,33 +108,32 @@ def perfTest():
             server.cmdPrint(server_cmd)
 
             if set_id == 1:
-                transfer_cmd = 'time nc ' + server_IP + ' ' + str(port) + ' < saved_models/set' + str(set_id) + '/users/user' + str(i) + '/u' + str(i) + '_r' + str(j) + '.pth &'
+                transfer_cmd = 'nc ' + server_IP + ' ' + str(port) + ' < saved_models/set' + str(set_id) + '/users/user' + str(i) + '/u' + str(i) + '_r' + str(j) + '.pth &'
             elif set_id == 2:
-                transfer_cmd = 'time nc ' + server_IP + ' ' + str(port) + ' < saved_models/set' + str(set_id) + '/users/user' + str(i) + '/u' + str(i) + '_r' + str(j) + '_compressed.pth &'
+                transfer_cmd = 'nc ' + server_IP + ' ' + str(port) + ' < saved_models/set' + str(set_id) + '/users/user' + str(i) + '/u' + str(i) + '_r' + str(j) + '_compressed.pth &'
             
             host.cmdPrint(transfer_cmd)
 
-            # time.sleep(100)
             port_counter = port_counter + 1
         
+        transfer_time = 0
         while not check_completion_of_sending(file_id=j):
+            transfer_time = transfer_time + 1
             time.sleep(1)
+        
+        # print(training_times[f'{j}'])
+        total_time = round(float(training_times[f'{j}']), 2) + transfer_time
+        print(f'Total time for sending file {j}: {total_time}')
+        
+        times.append(round(total_time, 2))
 
-        # time.sleep(100)
+    with open('Results/total_times_for_model_files.txt', 'w') as file:
+        for value in times:
+            file.write(f"{value}\n")
 
-    
-
-    # Debugging
-    # h1.cmd('jobs')
-    # h4.cmd('jobs')
     net.stop()
 
 
 if __name__ == '__main__':
     setLogLevel( 'info' )
-    # Debug for now
-    if 'testmode' in argv:
-        setLogLevel( 'debug' )
-    # Prevent test_simpleperf from failing due to packet loss
-    # perfTest( lossy=( 'testmode' not in argv ) )
     perfTest()
