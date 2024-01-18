@@ -17,6 +17,11 @@ from mininet.node import CPULimitedHost, OVSKernelSwitch, DefaultController
 from mininet.link import TCLink
 from mininet.util import dumpNodeConnections
 from mininet.log import setLogLevel, info
+import os
+
+number_of_users = 1
+number_of_files_per_user = 2
+set_id = 2
 
 class SingleSwitchTopo( Topo ):
     "Single switch connected to n hosts."
@@ -26,13 +31,58 @@ class SingleSwitchTopo( Topo ):
         for h in range(n):
             # Each host gets 50%/n of system CPU
             host = self.addHost('h%s' % (h), cpu=.5 / (n+1))
-            self.addLink(host, switch, bw=100, delay='5ms', loss=0, use_htb=True)
+            self.addLink(host, switch, bw=100, delay='0ms', loss=0, use_htb=True)
         
         self.addLink(switch, switch2, bw=10)
         server = self.addHost('server', cpu=.5 / (n+1))
-        self.addLink(server, switch2, bw=100, delay='5ms', loss=0, use_htb=True)
+        self.addLink(server, switch2, bw=100, delay='0ms', loss=0, use_htb=True)
 
+def get_file_size(file_path):
+    """Get the size of a file in bytes."""
+    try:
+        return os.path.getsize(file_path)
+    except OSError as e:
+        print(f"Error accessing file {file_path}: {e}")
+        return None
 
+def get_all_file_sizes():
+    base_path = 'saved_models/set' + str(set_id) + '/users/'
+
+    user_file_sizes = {}
+
+    for user in range(0, number_of_users):
+        user_key = f'user{user}'
+        user_file_sizes[user_key] = {}
+
+        for file_num in range(0, number_of_files_per_user):
+            if set_id == 1:
+                file_path = f'{base_path}user{user}/u{user}_r{file_num}.pth'
+            elif set_id == 2:
+                file_path = f'{base_path}user{user}/u{user}_r{file_num}_compressed.pth'
+            file_size = get_file_size(file_path)
+
+            if file_size is not None:
+                user_file_sizes[user_key][f'file{file_num}'] = file_size
+
+    # print(user_file_sizes)
+    return user_file_sizes
+
+def check_completion_of_sending(file_id):
+    all_file_sizes = get_all_file_sizes()
+    # print(all_file_sizes['user0'][f'file{file_id}'])
+    for user_id in range(0, number_of_users):
+        user_file_size = all_file_sizes[f'user{user_id}'][f'file{file_id}']
+
+        if set_id == 1:
+            server_path = 'saved_models/set' + str(set_id) + '/server/user' + str(user_id) + '/u' + str(user_id) + '_r' + str(file_id) + '.pth'
+        elif set_id == 2:
+            server_path = 'saved_models/set' + str(set_id) + '/server/user' + str(user_id) + '/u' + str(user_id) + '_r' + str(file_id) + '_compressed.pth'
+        size_of_file_in_server = get_file_size(server_path)
+
+        if size_of_file_in_server != user_file_size:
+            return False
+    return True
+    
 
 def perfTest():
     "Create network and run simple performance test"
@@ -41,29 +91,39 @@ def perfTest():
                    host=CPULimitedHost, link=TCLink,
                    autoStaticArp=True )
     net.start()
-    # net.pingAll()
+    net.pingAll()
 
 
     server = net.get('server')
     server_IP = server.IP()
     port_counter = 0
-    for j in range (0, 10): 
-        for i in range(0, 10):
+    
+    for j in range (0, number_of_files_per_user): 
+        for i in range(0, number_of_users):
             host = net.get('h' + str(i))
             port = 12345 + port_counter  
             
-            server_cmd = 'nc -l -p ' + str(port) + ' > saved_models/server/user' + str(i) + '/u' + str(i) + '_r' + str(j) + '.pth &'  # '/hello.txt &'
+            if set_id == 1:
+                server_cmd = 'nc -l -p ' + str(port) + ' > saved_models/set' + str(set_id) + '/server/user' + str(i) + '/u' + str(i) + '_r' + str(j) + '.pth &'
+            elif set_id == 2:
+                server_cmd = 'nc -l -p ' + str(port) + ' > saved_models/set' + str(set_id) + '/server/user' + str(i) + '/u' + str(i) + '_r' + str(j) + '_compressed.pth &'
             
             server.cmdPrint(server_cmd)
 
-            transfer_cmd = 'time nc ' + server_IP + ' ' + str(port) + ' < saved_models/users/user' + str(i) + '/u' + str(i) + '_r' + str(j) + '.pth &' # '/hello.txt &'
+            if set_id == 1:
+                transfer_cmd = 'time nc ' + server_IP + ' ' + str(port) + ' < saved_models/set' + str(set_id) + '/users/user' + str(i) + '/u' + str(i) + '_r' + str(j) + '.pth &'
+            elif set_id == 2:
+                transfer_cmd = 'time nc ' + server_IP + ' ' + str(port) + ' < saved_models/set' + str(set_id) + '/users/user' + str(i) + '/u' + str(i) + '_r' + str(j) + '_compressed.pth &'
             
             host.cmdPrint(transfer_cmd)
 
-            time.sleep(100)
+            # time.sleep(100)
             port_counter = port_counter + 1
         
-        time.sleep(100)
+        while not check_completion_of_sending(file_id=j):
+            time.sleep(1)
+
+        # time.sleep(100)
 
     
 
