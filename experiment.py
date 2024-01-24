@@ -11,7 +11,7 @@ import os
 
 number_of_users = 10
 number_of_files_per_user = 10
-set_id = 1
+set_id = 2
 
 class SingleSwitchTopo( Topo ):
     "Single switch connected to n hosts."
@@ -23,7 +23,9 @@ class SingleSwitchTopo( Topo ):
             host = self.addHost('h%s' % (h), cpu=.5 / (n+1))
             self.addLink(host, switch, bw=100*8, delay='0ms', loss=0, use_htb=True)
         
-        self.addLink(switch, switch2, bw=10*8)
+        # self.addLink(switch, switch2, bw=60*8)
+        # self.addLink(switch, switch2, bw=60*8, delay='5ms', loss=0.000001)
+        self.addLink(switch, switch2, bw=60*8, delay='5ms', loss=0.00001)
         server = self.addHost('server', cpu=.5 / (n+1))
         self.addLink(server, switch2, bw=100*8, delay='0ms', loss=0, use_htb=True)
 
@@ -118,18 +120,32 @@ def perfTest():
         
         transfer_time = 0
         while not check_completion_of_sending(file_id=j):
+            # if transfer_time > 3:
+            #     break
             transfer_time = transfer_time + 1
             time.sleep(1)
         
         # print(training_times[f'{j}'])
-        total_time = round(float(training_times[f'{j}']), 2) + transfer_time
+        total_time = round(float(training_times[f'{j}']), 6) + transfer_time
         print(f'Total time for sending file {j}: {total_time}')
         
-        times.append(round(total_time, 2))
+        times.append(round(total_time, 6))
 
-    with open('Results/total_times_for_model_files.txt', 'w') as file:
+    # with open('Results/weight_files_w_o_delay_loss.txt', 'w') as file:
+    #     for value in times:
+    #         file.write(f"{value}\n")
+
+    # with open('Results/weight_files_w_delay_and_smaller_loss.txt', 'w') as file:
+    #     for value in times:
+    #         file.write(f"{value}\n")
+    
+    with open('Results/weight_files_w_delay_and_larger_loss.txt', 'w') as file:
         for value in times:
             file.write(f"{value}\n")
+    
+    # with open('Results/model_files_w_delay_and_larger_loss.txt', 'w') as file:
+    #     for value in times:
+    #         file.write(f"{value}\n")
 
     net.stop()
 
