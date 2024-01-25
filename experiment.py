@@ -51,7 +51,10 @@ def get_all_file_sizes():
                 file_path = f'{base_path}user{user}/u{user}_r{file_num}.pth'
             elif set_id == 2:
                 file_path = f'{base_path}user{user}/u{user}_r{file_num}_compressed.pth'
-            file_size = get_file_size(file_path)
+            try:
+                file_size = get_file_size(file_path)
+            except:
+                continue
 
             if file_size is not None:
                 user_file_sizes[user_key][f'file{file_num}'] = file_size
@@ -69,7 +72,11 @@ def check_completion_of_sending(file_id):
             server_path = 'saved_models/set' + str(set_id) + '/server/user' + str(user_id) + '/u' + str(user_id) + '_r' + str(file_id) + '.pth'
         elif set_id == 2:
             server_path = 'saved_models/set' + str(set_id) + '/server/user' + str(user_id) + '/u' + str(user_id) + '_r' + str(file_id) + '_compressed.pth'
-        size_of_file_in_server = get_file_size(server_path)
+        
+        if os.path.getsize(server_path) != None:
+            size_of_file_in_server = get_file_size(server_path)
+        else:
+            size_of_file_in_server = 0
 
         if size_of_file_in_server != user_file_size:
             return False
@@ -97,10 +104,11 @@ def perfTest():
     
     training_times = get_training_times()
     times = []
+    server_pids = []
     for j in range (0, number_of_files_per_user): 
         for i in range(0, number_of_users):
             host = net.get('h' + str(i))
-            port = 12345 + port_counter  
+            port = 12345  + port_counter  
             
             if set_id == 1:
                 server_cmd = 'nc -l -p ' + str(port) + ' > saved_models/set' + str(set_id) + '/server/user' + str(i) + '/u' + str(i) + '_r' + str(j) + '.pth &'
@@ -108,6 +116,9 @@ def perfTest():
                 server_cmd = 'nc -l -p ' + str(port) + ' > saved_models/set' + str(set_id) + '/server/user' + str(i) + '/u' + str(i) + '_r' + str(j) + '_compressed.pth &'
             
             server.cmdPrint(server_cmd)
+
+            pid = server.cmd('echo $!').strip()
+            server_pids.append(pid)
 
             if set_id == 1:
                 transfer_cmd = 'nc ' + server_IP + ' ' + str(port) + ' < saved_models/set' + str(set_id) + '/users/user' + str(i) + '/u' + str(i) + '_r' + str(j) + '.pth &'
@@ -118,18 +129,20 @@ def perfTest():
 
             port_counter = port_counter + 1
         
-        transfer_time = 0
-        while not check_completion_of_sending(file_id=j):
-            # if transfer_time > 3:
-            #     break
-            transfer_time = transfer_time + 1
-            time.sleep(1)
-        
-        # print(training_times[f'{j}'])
-        total_time = round(float(training_times[f'{j}']), 6) + transfer_time
+        start_time = time.time()
+        while True:
+            if check_completion_of_sending(file_id=j):
+                break
+        end_time = time.time()
+        duration = end_time - start_time
+        total_time = round(float(training_times[f'{j}']), 6) + duration
         print(f'Total time for sending file {j}: {total_time}')
         
         times.append(round(total_time, 6))
+        for pid in server_pids:
+            server.cmd(f'kill {pid}')
+        server_pids.clear()
+        time.sleep(35)
 
     # with open('Results/weight_files_w_o_delay_loss.txt', 'w') as file:
     #     for value in times:
